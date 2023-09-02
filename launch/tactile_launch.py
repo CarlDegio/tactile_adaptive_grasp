@@ -4,16 +4,16 @@ from launch_ros.actions import Node
 
 def generate_launch_description() -> LaunchDescription:
     ld = LaunchDescription()
-    # ld.add_action(
-    #     Node(
-    #         package="gelsight_ros2",
-    #         executable="gelsight_showdepth",
-    #         output="screen",
-    #         name="gsmini_left",
-    #         parameters=[{"device_name": "GelSight Mini R0B 28JC-MN43"}],
-    #         remappings=[('/gsmini/depth', '/gsmini_left/depth')],
-    #     )
-    # )
+    ld.add_action(
+        Node(
+            package="gelsight_ros2",
+            executable="gelsight_showdepth",
+            output="screen",
+            name="gsmini_left",
+            parameters=[{"device_name": "GelSight Mini R0B 28JC-MN43"}],
+            remappings=[('/gsmini/depth', '/gsmini_left/depth')],
+        )
+    )
     # ld.add_action(
     #     Node(
     #         package="gelsight_ros2",

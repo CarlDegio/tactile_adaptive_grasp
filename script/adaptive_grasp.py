@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re
+import time
 
 import numpy as np
 import rclpy
@@ -16,8 +17,8 @@ class AdaptiveGrasp(Node):
     def __init__(self):
         super().__init__('bye140_node')
         self.declare_parameter('control_frequency', 5.0)
-        self.left_subscription = self.create_subscription(Image, '/gsmini_left/depth', self.left_depth_cb_, 10)
-        self.left_subscription = self.create_subscription(Image, '/gsmini_right/depth', self.left_depth_cb_, 10)
+        self.left_subscription = self.create_subscription(Image, '/gsmini_left/depth', self.left_depth_cb_, 5)
+        self.right_subscription = self.create_subscription(Image, '/gsmini_right/depth', self.left_depth_cb_, 5)
         self.gripper_status = self.create_subscription(ByStatus, '/by_status', self.gripper_status_cb, 10)
         self.timer_callback_group=MutuallyExclusiveCallbackGroup()
         self.gripper_move = self.create_client(MoveTo, '/moveto')
@@ -31,22 +32,27 @@ class AdaptiveGrasp(Node):
         self.right_feature = np.zeros(3, dtype=np.float32)
 
         self.gripper_pos = 0.0
-        self.command_pos = 100.0
+        self.command_pos = 30.0
+
+        self.tactile_calibrate_flag=0
 
     def left_depth_cb_(self, msg: Image):
+        self.get_logger().info(f"into depth cb")
         self.left_depth = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
         m0, cx, cy = get_total_and_center(self.left_depth)
-        self.left_feature[0],self.left_feature[2],self.left_feature[3]=m0,cx,cy
+        self.left_feature[0],self.left_feature[1],self.left_feature[2]=m0,cx,cy
         self.get_logger().info(f"depth_total:{m0}")
         left_depth_c3 = cv2.cvtColor(self.left_depth, cv2.COLOR_GRAY2BGR)
         left_depth_c3 = cv2.circle(left_depth_c3, (int(cx), int(cy)), 5, (0, 0, 255), -1)
-        cv2.imshow("center", left_depth_c3)
-        cv2.waitKey(1)
+        # cv2.imshow("center", left_depth_c3)
+        # cv2.waitKey(1)
+        self.tactile_calibrate_flag+=1
+        self.get_logger().info("got here")
 
     def right_depth_cb(self, msg: Image):
         self.right_depth = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
         m0, cx, cy = get_total_and_center(self.right_depth)
-        self.right_feature[0], self.right_feature[2], self.right_feature[3] = m0, cx, cy
+        self.right_feature[0], self.right_feature[1], self.right_feature[2] = m0, cx, cy
 
     def gripper_status_cb(self, msg: ByStatus):
         self.gripper_pos = msg.position
@@ -61,12 +67,15 @@ class AdaptiveGrasp(Node):
         bool waitflag
         :return:
         """
-        if self.left_feature[0]<0.005:
+        if self.left_feature[0]<0:
             self.command_pos = self.command_pos - 1
         else:
-            self.command_pos = self.command_pos - (0.05-self.left_feature[0])*4
+            self.command_pos = self.command_pos - (0.02-self.left_feature[0])*10
+
+        if self.tactile_calibrate_flag<50:
+            self.command_pos=30.0
         request = MoveTo.Request(position=self.command_pos, speed=150.0, acceleration=500.0,
-                                 torque=0.4, tolerance=20, waitflag=False)
+                                 torque=0.2, tolerance=20.0, waitflag=False)
         self.get_logger().info("start service call")
         future = self.gripper_move.call(request)
 

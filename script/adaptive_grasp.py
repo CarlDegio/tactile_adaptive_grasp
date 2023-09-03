@@ -15,7 +15,7 @@ from cv_bridge import CvBridge
 
 class AdaptiveGrasp(Node):
     def __init__(self):
-        super().__init__('bye140_node')
+        super().__init__('adaptive_grasp_node')
         self.declare_parameter('control_frequency', 5.0)
         self.left_subscription = self.create_subscription(Image, '/gsmini_left/depth', self.left_depth_cb_, 5)
         self.right_subscription = self.create_subscription(Image, '/gsmini_right/depth', self.left_depth_cb_, 5)

@@ -11,7 +11,8 @@ def generate_launch_description() -> LaunchDescription:
             output="screen",
             name="gsmini_left",
             parameters=[{"device_name": "GelSight Mini R0B 28JC-MN43"}],
-            remappings=[('/gsmini/depth', '/gsmini_left/depth')],
+            remappings=[('/gsmini/depth', '/gsmini_left/depth'),
+                        ('/gsmini/rgb', '/gsmini_left/rgb')],
         )
     )
     # ld.add_action(
@@ -21,7 +22,8 @@ def generate_launch_description() -> LaunchDescription:
     #         output="screen",
     #         name="gsmini_right",
     #         parameters=[{"device_name":"GelSight Mini R0B 2871-46HU"}],
-    #         remappings=[('/gsmini/depth', '/gsmini_right/depth')],
+    #         remappings=[('/gsmini/depth', '/gsmini_right/depth'),
+    #                     ('/gsmini/rgb', '/gsmini_left/rgb')],
     #     )
     # )
     ld.add_action(

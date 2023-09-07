@@ -30,8 +30,8 @@ class AdaptiveGrasp(Node):
         self.gripper_status = self.create_subscription(ByStatus, '/by_status', self.gripper_status_cb, 10)
         self.timer_callback_group = MutuallyExclusiveCallbackGroup()
         self.gripper_move = self.create_client(MoveTo, '/moveto')
-        # self.control_timer = self.create_timer(1 / self.get_parameter('control_frequency').value,
-        #                                        self.gripper_move_command, callback_group=self.timer_callback_group)
+        self.control_timer = self.create_timer(1 / self.get_parameter('control_frequency').value,
+                                               self.gripper_move_command, callback_group=self.timer_callback_group)
         self.reset_gripper = self.create_service(Trigger, '/slack_gripper', self.slack_gripper)
         self.start_gripper = self.create_service(Trigger, '/start_gripper', self.start_gripper)
 

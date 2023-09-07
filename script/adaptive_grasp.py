@@ -30,8 +30,8 @@ class AdaptiveGrasp(Node):
         self.gripper_status = self.create_subscription(ByStatus, '/by_status', self.gripper_status_cb, 10)
         self.timer_callback_group = MutuallyExclusiveCallbackGroup()
         self.gripper_move = self.create_client(MoveTo, '/moveto')
-        self.control_timer = self.create_timer(1 / self.get_parameter('control_frequency').value,
-                                               self.gripper_move_command, callback_group=self.timer_callback_group)
+        # self.control_timer = self.create_timer(1 / self.get_parameter('control_frequency').value,
+        #                                        self.gripper_move_command, callback_group=self.timer_callback_group)
         self.reset_gripper = self.create_service(Trigger, '/slack_gripper', self.slack_gripper)
         self.start_gripper = self.create_service(Trigger, '/start_gripper', self.start_gripper)
 
@@ -58,33 +58,39 @@ class AdaptiveGrasp(Node):
         self.left_depth = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
         m0, cx, cy = get_total_and_center(self.left_depth)
         self.left_feature[0], self.left_feature[1], self.left_feature[2] = m0, cx, cy
-        self.get_logger().info(f"left depth_total:{m0}")
+
+        # 为了数据同步
+        self.left_opt_flow.get_flow(self.left_rgb)
+        self.left_feature[3], self.left_feature[4] = self.left_opt_flow.get_flow_entropy()
+
+        self.get_logger().info("left_feature" + str(self.left_feature))
         # left_depth_c3 = cv2.cvtColor(self.left_depth, cv2.COLOR_GRAY2BGR)
         # left_depth_c3 = cv2.circle(left_depth_c3, (int(cx), int(cy)), 5, (0, 0, 255), -1)
         # cv2.imshow("center", left_depth_c3)
         # cv2.waitKey(1)
         feature_msg = Float32MultiArray()
         feature_msg.layout.dim.append(self.dimension)
-        feature_msg.data = self.left_feature
+        feature_msg.data = self.right_feature.tolist()
         self.left_feature_pub.publish(feature_msg)
 
     def left_rgb_cb_(self, msg: Image):
         self.left_rgb = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-        self.left_opt_flow.get_flow(self.left_rgb)
-        self.left_feature[3], self.left_feature[4] = self.left_opt_flow.get_flow_entropy()
+
     def right_depth_cb(self, msg: Image):
         self.right_depth = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
         m0, cx, cy = get_total_and_center(self.right_depth)
         self.right_feature[0], self.right_feature[1], self.right_feature[2] = m0, cx, cy
+
+        self.right_opt_flow.get_flow(self.right_rgb)
+        self.right_feature[3], self.right_feature[4] = self.right_opt_flow.get_flow_entropy()
+
         feature_msg = Float32MultiArray()
         feature_msg.layout.dim.append(self.dimension)
-        feature_msg.data = self.right_feature
+        feature_msg.data = self.right_feature.tolist()
         self.right_feature_pub.publish(feature_msg)
 
     def right_rgb_cb_(self, msg: Image):
-        self.left_rgb = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-        self.left_opt_flow.get_flow(self.left_rgb)
-        self.left_feature[3], self.left_feature[4] = self.left_opt_flow.get_flow_entropy()
+        self.right_rgb = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
 
     def gripper_status_cb(self, msg: ByStatus):
         self.gripper_pos = msg.position

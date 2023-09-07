@@ -23,12 +23,14 @@ class Flow:
         self.row = row
         self.prvs_gray = np.zeros((row, col)).astype(np.uint8)
         self.opt_flow = np.zeros((row, col, 2)).astype(np.float32)
-        self.initial = False
+        self.initial = 0
 
     def get_flow(self, img):
-        if not self.initial:
-            self.initial = True
-            self.prvs_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        if self.initial <= 20:
+            self.initial += 1
+            self.prvs_gray = cv2.cvtColor(np.copy(img), cv2.COLOR_BGR2GRAY)
+        # cv2.imshow("what", self.prvs_gray)
+        # cv2.waitKey(1)
         next_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         self.opt_flow = cv2.calcOpticalFlowFarneback(self.prvs_gray, next_gray, None, 0.5, 3, int(180 * self.col / 960),
                                                      5, 5, 1.2, 0)

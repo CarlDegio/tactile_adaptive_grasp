@@ -21,7 +21,7 @@ class AdaptiveGrasp(Node):
         super().__init__('adaptive_grasp_node')
         self.declare_parameter('control_frequency', 5.0)
         self.left_subscription_depth = self.create_subscription(Image, '/gsmini_left/depth', self.left_depth_cb_, 5)
-        self.right_subscription_depth = self.create_subscription(Image, '/gsmini_right/depth', self.left_depth_cb_, 5)
+        self.right_subscription_depth = self.create_subscription(Image, '/gsmini_right/depth', self.right_depth_cb_, 5)
         self.left_subscription_rgb = self.create_subscription(Image, '/gsmini_left/rgb', self.left_rgb_cb_, 5)
         self.right_subscription_rgb = self.create_subscription(Image, '/gsmini_right/rgb', self.right_rgb_cb_, 5)
         self.left_feature_pub = self.create_publisher(Float32MultiArray, '/left_feature', 10)
@@ -29,7 +29,8 @@ class AdaptiveGrasp(Node):
 
         self.gripper_status = self.create_subscription(ByStatus, '/by_status', self.gripper_status_cb, 10)
         self.timer_callback_group = MutuallyExclusiveCallbackGroup()
-        self.gripper_move = self.create_client(MoveTo, '/moveto')
+        self.move_to_callback_group = MutuallyExclusiveCallbackGroup()
+        self.gripper_move = self.create_client(MoveTo, '/moveto', callback_group=self.move_to_callback_group)
         self.control_timer = self.create_timer(1 / self.get_parameter('control_frequency').value,
                                                self.gripper_move_command, callback_group=self.timer_callback_group)
         self.reset_gripper = self.create_service(Trigger, '/slack_gripper', self.slack_gripper)
@@ -70,19 +71,20 @@ class AdaptiveGrasp(Node):
         # cv2.waitKey(1)
         feature_msg = Float32MultiArray()
         feature_msg.layout.dim.append(self.dimension)
-        feature_msg.data = self.right_feature.tolist()
+        feature_msg.data = self.left_feature.tolist()
         self.left_feature_pub.publish(feature_msg)
 
     def left_rgb_cb_(self, msg: Image):
         self.left_rgb = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
 
-    def right_depth_cb(self, msg: Image):
+    def right_depth_cb_(self, msg: Image):
         self.right_depth = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
         m0, cx, cy = get_total_and_center(self.right_depth)
         self.right_feature[0], self.right_feature[1], self.right_feature[2] = m0, cx, cy
 
         self.right_opt_flow.get_flow(self.right_rgb)
         self.right_feature[3], self.right_feature[4] = self.right_opt_flow.get_flow_entropy()
+        self.get_logger().info("right_feature" + str(self.right_feature))
 
         feature_msg = Float32MultiArray()
         feature_msg.layout.dim.append(self.dimension)
@@ -108,11 +110,11 @@ class AdaptiveGrasp(Node):
         if self.left_feature[0] < 0:
             self.command_pos = self.command_pos - 1
         else:
-            self.command_pos = self.command_pos - (0.02 - self.left_feature[0]) * 10
+            self.command_pos = self.command_pos - (0.04 - self.left_feature[0] - self.right_feature[0]) * 10
 
         self.tactile_calibrate_flag += 1
-        if self.tactile_calibrate_flag < 50:
-            self.command_pos = 30.0
+        if self.tactile_calibrate_flag < 100:
+            self.command_pos = 45.0
         request = MoveTo.Request(position=self.command_pos, speed=150.0, acceleration=500.0,
                                  torque=0.2, tolerance=20.0, waitflag=False)
         future = self.gripper_move.call(request)
@@ -122,12 +124,22 @@ class AdaptiveGrasp(Node):
         # else:
         #     self.get_logger().info('Service call failed.')
 
-    def slack_gripper(self):
+    def slack_gripper(self,request, response):
         self.tactile_calibrate_flag = 0
+        self.command_pos = 80.0
         self.control_timer.cancel()
+        self.gripper_move_command()
 
-    def start_gripper(self):
+        response.success = True
+        response.message = 'slack_gripper triggered successfully!'
+        return response
+
+    def start_gripper(self,request, response):
         self.control_timer.reset()
+
+        response.success = True
+        response.message = 'start_gripper triggered successfully!'
+        return response
 
 
 def get_total_and_center(depth_image: np.ndarray):

@@ -22,4 +22,9 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  script/catch_tactile_video.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
